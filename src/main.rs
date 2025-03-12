@@ -1,3 +1,4 @@
+mod error;
 use axum::{ http::Method, routing::get, Router, extract::Extension };
 use tower_http::cors::{ Any, CorsLayer };
 
@@ -5,9 +6,10 @@ use async_graphql_axum::{ GraphQLRequest, GraphQLResponse };
 
 use async_graphql::{ Context, EmptySubscription, Object, Schema, SimpleObject };
 
-use serde::{ Deserialize, Serialize };
+use serde::Serialize;
 
 use std::sync::{ Arc, Mutex };
+
 
 // App state, replace with dynamo db connection
 struct AppState {
