@@ -12,6 +12,7 @@ pub enum AppError {
     // Database related errors
     #[error("Database error: {0}")] DatabaseError(String),
 
+
     // Auth errors
     #[error("Unauthorized: {0}")] Unauthorized(String),
 
