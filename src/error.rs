@@ -1,49 +1,44 @@
 use async_graphql::{ Error as GraphQLError, ErrorExtensions };
+// use aws_sdk_dynamodb::error::SdkError;
 use axum::{ http::StatusCode, response::{ IntoResponse, Response } };
-use std::fmt;
+use std::env::VarError;
+use thiserror::Error;
 
-#[derive(Debug)]
+#[derive(Error, Debug)]
 pub enum AppError {
+    // Env errors
+    #[error("Environment variable error: {0}")] EnvError(#[from] VarError),
+
     // Database related errors
-    DatabaseError(String),
+    #[error("Database error: {0}")] DatabaseError(String),
 
     // Auth errors
-    Unauthorized(String),
-    Forbidden(String),
+    #[error("Unauthorized: {0}")] Unauthorized(String),
+
+    #[error("Forbidden: {0}")] Forbidden(String),
 
     // Validation errors
-    ValidationError(String),
+    #[error("Validation error: {0}")] ValidationError(String),
 
     // Not found errors
-    NotFound(String),
+    #[error("Not found: {0}")] NotFound(String),
 
     // External service errors
-    ExternalServiceError(String),
+    #[error("External service error: {0}")] ExternalServiceError(String),
 
     // Generic errors
-    InternalServerError(String),
+    #[error("Internal server error: {0}")] InternalServerError(String),
 }
 
-impl fmt::Display for AppError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::DatabaseError(msg) => write!(f, "Database error: {}", msg),
-            Self::Unauthorized(msg) => write!(f, "Unauthorized: {}", msg),
-            Self::Forbidden(msg) => write!(f, "Forbidden: {}", msg),
-            Self::ValidationError(msg) => write!(f, "Validation error: {}", msg),
-            Self::NotFound(msg) => write!(f, "Not found: {}", msg),
-            Self::ExternalServiceError(msg) => write!(f, "External service error: {}", msg),
-            Self::InternalServerError(msg) => write!(f, "Internal server error: {}", msg),
-        }
-    }
-}
-
-impl std::error::Error for AppError {}
-
-// Convert AppError to GraphQLError for GraphQL responses
 impl AppError {
     pub fn to_graphql_error(&self) -> GraphQLError {
         match self {
+            AppError::EnvError(msg) => {
+                GraphQLError::new(msg.clone().to_string()).extend_with(|_, e| {
+                    e.set("code", "ENV_ERROR");
+                    e.set("status", 404);
+                })
+            }
             AppError::ValidationError(msg) => {
                 GraphQLError::new(msg.clone()).extend_with(|_, e| {
                     e.set("code", "VALIDATION_ERROR");
@@ -84,6 +79,7 @@ impl AppError {
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         let (status, message) = match self {
+            Self::EnvError(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg.to_string()),
             Self::DatabaseError(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg),
             Self::Unauthorized(msg) => (StatusCode::UNAUTHORIZED, msg),
             Self::Forbidden(msg) => (StatusCode::FORBIDDEN, msg),

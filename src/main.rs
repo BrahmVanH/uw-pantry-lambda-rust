@@ -1,4 +1,6 @@
 mod error;
+mod db;
+use aws_sdk_dynamodb::Client;
 use axum::{ http::Method, routing::get, Router, extract::Extension };
 use tower_http::cors::{ Any, CorsLayer };
 
@@ -10,13 +12,34 @@ use serde::Serialize;
 
 use std::sync::{ Arc, Mutex };
 
+use crate::error::AppError;
 
 // App state, replace with dynamo db connection
 struct AppState {
     next_user_id: Mutex<u64>,
+    db_client: Client,
 }
 
-// structs
+// Success http response struct
+#[derive(Debug, Serialize)]
+struct SuccessResponse {
+    pub body: String,
+}
+
+#[derive(Debug, Serialize)]
+struct FailureResponse {
+    pub body: String,
+}
+
+// Implement Display for FailureResponse
+impl std::fmt::Display for FailureResponse {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.body)
+    }
+}
+
+// Implement Error trait for FailureResponse
+impl std::error::Error for FailureResponse {}
 
 #[derive(SimpleObject, Serialize)]
 struct User {
@@ -73,10 +96,20 @@ async fn main() {
     // Initialize tracing
     tracing_subscriber::fmt::init();
 
+    // Create db client
+    let db_client = match db::setup_local_client().await {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("Fatal error during startup: {}", e);
+            std::process::exit(1);
+        }
+    };
+
     // Define app state
     // Replace with db connection
     let state = Arc::new(AppState {
         next_user_id: Mutex::new(1337),
+        db_client,
     });
 
     let schema = Schema::build(QueryRoot, MutationRoot, EmptySubscription).data(state).finish();
@@ -94,7 +127,16 @@ async fn main() {
         .layer(cors);
 
     // Run app with hyper, listen globally on port 3000
-    let listener = tokio::net::TcpListener::bind(&"0.0.0.0:3000").await.unwrap();
+    let listener = match tokio::net::TcpListener::bind(&"0.0.0.0:3000").await {
+        Ok(l) => l,
+        Err(e) => {
+            eprintln!("Fatal error during startup: {}", e);
+            std::process::exit(1);
+        }
+    };
     println!("Server running on http://localhost:3000");
-    axum::serve(listener, app).await.unwrap();
+    axum::serve(listener, app).await.unwrap_or_else(|e| {
+        eprintln!("Fatal error during startup: {}", e);
+        std::process::exit(1);
+    });
 }
