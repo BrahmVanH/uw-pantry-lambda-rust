@@ -15,8 +15,10 @@ use std::sync::{ Arc, Mutex };
 mod schema;
 mod error;
 mod db;
+mod models;
 
 // App state, replace with dynamo db connection
+#[derive(Clone)]
 pub struct AppState {
     db_client: Client,
 }
@@ -56,11 +58,20 @@ async fn graphql_playground() -> impl axum::response::IntoResponse {
 
 #[tokio::main]
 async fn main() {
-    // Initialize tracing
-    tracing_subscriber::fmt::init();
+    // Initialize tracing with detailed configuration
+    tracing_subscriber
+        ::fmt()
+        .with_max_level(tracing::Level::DEBUG)
+        .with_target(false)
+        .with_thread_ids(true)
+        .with_line_number(true)
+        .with_file(true)
+        .init();
+
+    tracing::info!("Starting up UW Pantry service");
 
     // Create db client
-    let db_client = match db::setup_local_client().await {
+    let db_client = match db::local::setup_local_client().await {
         Ok(c) => c,
         Err(e) => {
             eprintln!("Fatal error during startup: {}", e);
@@ -68,13 +79,17 @@ async fn main() {
         }
     };
 
+    db::init::ensure_tables_exist(&db_client);
+
     // Define app state
     // Replace with db connection
-    let state = Arc::new(AppState {
-        db_client,
-    });
+    // let state = Arc::new(AppState {
+    //     db_client,
+    // });
 
-    let schema = Schema::build(QueryRoot, MutationRoot, EmptySubscription).data(state.clone()).finish();
+    let schema = Schema::build(QueryRoot, MutationRoot, EmptySubscription)
+        .data(db_client.clone())
+        .finish();
 
     // Configure cors
     let cors = CorsLayer::new()
@@ -88,7 +103,7 @@ async fn main() {
     let app = app.layer(
         ServiceBuilder::new()
             .layer(CompressionLayer::new().gzip(true).deflate(true).br(true))
-            .layer(Extension(state))
+            .layer(Extension(db_client))
             .layer(Extension(schema))
             .layer(cors)
     );

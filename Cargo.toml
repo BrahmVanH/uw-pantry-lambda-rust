@@ -4,17 +4,22 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-async-graphql = "7.0.15"
+argon2 = {version = "0.5.3", features = ["std"]}
+async-graphql = { version = "7.0.15", features = ["chrono"] }
 async-graphql-axum = "7.0.15"
 aws-config = {version = "1.6.0", features = ["behavior-version-latest"]}
 aws-sdk-dynamodb = "1.68.0"
 axum = "0.8.1"
 axum-extra = "0.10.0"
+chrono = {version = "0.4.40", features = ["serde"]}
 dotenvy = "0.15.7"
+rand_core = {version = "0.9.3", features = ["std"]}
 serde = {version = "1.0.219", features = ["derive"]}
 serde_json = "1.0.140"
 thiserror = "2.0.12"
 tokio = {version = "1.44.0", features = ["full"]}
 tower = "0.5.2"
 tower-http = {version = "0.6.2", features = ["cors", "compression-full"]}
+tracing = "0.1.41"
 tracing-subscriber = {version = "0.3.19", features = ["env-filter"]}
+uuid = { version = "1.16.0", features = ["v4"] }

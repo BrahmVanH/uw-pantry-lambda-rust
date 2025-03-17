@@ -1,6 +1,7 @@
 use aws_config::{ meta::region::RegionProviderChain, BehaviorVersion };
 use aws_sdk_dynamodb::Client;
 use dotenvy::dotenv;
+use tracing::{ info, warn };
 use std::env;
 
 use crate::error::AppError;
@@ -8,6 +9,7 @@ use crate::error::AppError;
 pub async fn setup_local_client() -> Result<Client, AppError> {
     dotenv().ok();
     let region_provider = RegionProviderChain::default_provider().or_else("us-east-2");
+    info!("db region provider value: {:?}", &region_provider);
 
     let config = aws_config
         ::from_env()
@@ -15,10 +17,13 @@ pub async fn setup_local_client() -> Result<Client, AppError> {
         .region(region_provider)
         .load().await;
 
+    info!("db config value: {:?}", &config);
+
     // Load DB_URL from ENV
     let db_url = match env::var("DB_URL") {
         Ok(env) => env,
         Err(e) => {
+            eprintln!("Failed to get DB_URL from env");
             return Err(AppError::EnvError(e));
         }
     };
