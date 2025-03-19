@@ -2,6 +2,7 @@ use async_graphql::{ Context, Object, ID, Result as GraphQLResult };
 use aws_sdk_dynamodb::types::AttributeValue;
 use chrono::{ DateTime, Utc };
 use serde::{ Deserialize, Serialize };
+use tracing::info;
 use std::collections::HashMap;
 use argon2::{
     password_hash::{
@@ -64,13 +65,35 @@ impl User {
     }
     // Turn into and from DynamoDB User Item
     pub fn from_item(item: &HashMap<String, AttributeValue>) -> Option<Self> {
-        Some(Self {
-            id: item.get("id")?.as_s().ok()?.clone(),
-            email: item.get("email")?.as_s().ok()?.clone(),
-            password_hash: item.get("password")?.as_s().ok()?.clone(),
-            first_name: item.get("first_name")?.as_s().ok()?.clone(),
-            last_name: item.get("last_name")?.as_s().ok()?.clone(),
-            pantry_name: item.get("email")?.as_s().ok()?.clone(),
+        info!("calling from_item with: {:?}", &item);
+
+        // Add debug logs to trace which field might be failing
+        let id = item.get("id")?.as_s().ok()?;
+        info!("got id: {}", id);
+
+        let email = item.get("email")?.as_s().ok()?;
+        info!("got email: {}", email);
+
+        let password = item.get("password_hash")?.as_s().ok()?;
+        info!("got password hash");
+
+        let first_name = item.get("first_name")?.as_s().ok()?;
+        info!("got first_name: {}", first_name);
+
+        let last_name = item.get("last_name")?.as_s().ok()?;
+        info!("got last_name: {}", last_name);
+
+        // Fix: Changed from "email" to "pantry_name"
+        let pantry_name = item.get("pantry_name")?.as_s().ok()?;
+        info!("got pantry_name: {}", pantry_name);
+
+        let res = Some(Self {
+            id: id.to_string(),
+            email: email.to_string(),
+            password_hash: password.to_string(),
+            first_name: first_name.to_string(),
+            last_name: last_name.to_string(),
+            pantry_name: pantry_name.to_string(),
             created_at: item
                 .get("created_at")
                 .and_then(|v| v.as_s().ok())
@@ -81,7 +104,10 @@ impl User {
                 .and_then(|v| v.as_s().ok())
                 .and_then(|s| s.parse::<DateTime<Utc>>().ok())
                 .unwrap_or_else(|| Utc::now()),
-        })
+        });
+
+        info!("result of from_item: {:?}", &res);
+        res
     }
 
     pub fn to_item(&self) -> HashMap<String, AttributeValue> {

@@ -17,6 +17,7 @@ pub async fn setup_local_client() -> Result<Client, AppError> {
         .region(region_provider)
         .load().await;
 
+    info!("db config value: {:?}", &config);
 
     // Load DB_URL from ENV
     let db_url = match env::var("DB_URL") {

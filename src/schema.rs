@@ -39,11 +39,15 @@ impl QueryRoot {
                 ).to_graphql_error()
             })?;
 
+        info!("get all users response: {:?}", response);
+
         let users = response
             .items()
             .iter()
             .filter_map(|item| User::from_item(item))
             .collect::<Vec<User>>();
+
+        info!("users from response items: {:?}", users);
 
         Ok(users)
     }
@@ -66,12 +70,16 @@ impl MutationRoot {
         last_name: String
     ) -> Result<User, Error> {
         // Transform context error into our AppError, then into GraphQL error
+        info!("creating new user: {}", email);
         let db_client = ctx.data::<Client>().map_err(|e| {
             warn!("Failed to get db_client from context: {:?}", e);
             AppError::InternalServerError(
                 "Failed to access application db_client".to_string()
             ).to_graphql_error()
         })?;
+
+        info!("successfully created db_client: {:?}", &db_client);
+
         let id = Uuid::new_v4().to_string();
 
         let user = match User::new(id, email, &password, first_name, last_name, pantry_name) {
@@ -82,7 +90,7 @@ impl MutationRoot {
         };
         let item = user.to_item();
         // Transform DynamoDB error into our AppError, then into GraphQL error
-        db_client
+        let put_item_output = db_client
             .put_item()
             .table_name("Users")
             .set_item(Some(item))
@@ -92,8 +100,8 @@ impl MutationRoot {
                 AppError::DatabaseError(
                     format!("Failed to create user: {}", err)
                 ).to_graphql_error()
-            })?;
-
+            });
+        info!("put_item_output: {:?}", &put_item_output);
         Ok(user)
     }
 }

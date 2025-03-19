@@ -1,5 +1,6 @@
 use aws_sdk_dynamodb::Client;
 use axum::{ http::Method, routing::get, Router, extract::Extension };
+use error::AppError;
 use schema::{ MutationRoot, QueryRoot };
 use tower::builder::ServiceBuilder;
 use tower_http::{ compression::CompressionLayer, cors::{ Any, CorsLayer } };
@@ -9,6 +10,7 @@ use async_graphql_axum::{ GraphQLRequest, GraphQLResponse };
 use async_graphql::{ Context, EmptySubscription, Object, Schema, SimpleObject };
 
 use serde::Serialize;
+use tracing::{ warn, error };
 
 use std::sync::{ Arc, Mutex };
 
@@ -61,7 +63,7 @@ async fn main() {
     // Initialize tracing with detailed configuration
     tracing_subscriber
         ::fmt()
-        .with_max_level(tracing::Level::DEBUG)
+        .with_max_level(tracing::Level::INFO)
         .with_target(false)
         .with_thread_ids(true)
         .with_line_number(true)
@@ -79,7 +81,7 @@ async fn main() {
         }
     };
 
-    db::init::ensure_tables_exist(&db_client);
+    db::init::ensure_tables_exist(&db_client).await.unwrap();
 
     // Define app state
     // Replace with db connection
