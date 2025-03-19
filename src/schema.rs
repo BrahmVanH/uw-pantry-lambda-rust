@@ -1,5 +1,8 @@
+use std::collections::HashMap;
+
 use async_graphql::{ Context, Error, Object, SimpleObject, Result as GraphQLResult };
 use aws_sdk_dynamodb::{ types::{ error::InternalServerError, AttributeValue }, Client };
+use axum::http::response;
 use serde::Serialize;
 use tracing::{ debug, info, warn };
 use crate::models::user::User;
@@ -19,6 +22,7 @@ impl QueryRoot {
         "sup, crabs?".to_string()
     }
     async fn users(&self, ctx: &Context<'_>) -> GraphQLResult<Vec<User>> {
+        let table_name = "Users";
         // get db instance from context
         let db_client = ctx.data::<Client>().map_err(|e| {
             warn!("Failed to get db_client from context: {:?}", e);
@@ -30,7 +34,7 @@ impl QueryRoot {
         // scan table for all users
         let response = db_client
             .scan()
-            .table_name("Users")
+            .table_name(table_name)
             .send().await
             .map_err(|e| {
                 warn!("Failed to get db_client from context: {:?}", e);
@@ -50,6 +54,79 @@ impl QueryRoot {
         info!("users from response items: {:?}", users);
 
         Ok(users)
+    }
+
+    // Get user by ID
+    async fn user_by_id(&self, ctx: &Context<'_>, user_id: String) -> GraphQLResult<Option<User>> {
+        let table_name = "Users";
+
+        // get db instance from context
+        let db_client = ctx.data::<Client>().map_err(|e| {
+            warn!("Failed to get db_client from context: {:?}", e);
+            AppError::InternalServerError(
+                "Failed to access application db_client".to_string()
+            ).to_graphql_error()
+        })?;
+
+        let mut key = HashMap::new();
+        key.insert("id".to_string(), AttributeValue::S(user_id.to_string()));
+
+        let response = db_client
+            .get_item()
+            .table_name(table_name)
+            .set_key(Some(key))
+            .send().await
+            .map_err(|e| {
+                warn!("Failed to get db_client from context: {:?}", e);
+                AppError::DatabaseError(
+                    "Failed to get user by id from db".to_string()
+                ).to_graphql_error()
+            })?;
+
+        if let Some(item) = response.item {
+            let user = User::from_item(&item);
+            Ok(user)
+        } else {
+            Ok(None)
+        }
+    }
+
+    // Get user by email
+    async fn user_by_email(&self, ctx: &Context<'_>, email: String) -> GraphQLResult<Option<User>> {
+        let table_name = "Users";
+        let index_name = "EmailIndex";
+        let key_condition_expression = "email = :email";
+
+        // get db instance from context
+        let db_client = ctx.data::<Client>().map_err(|e| {
+            warn!("Failed to get db_client from context: {:?}", e);
+            AppError::InternalServerError(
+                "Failed to access application db_client".to_string()
+            ).to_graphql_error()
+        })?;
+
+        let mut key = HashMap::new();
+        key.insert("email".to_string(), AttributeValue::S(email.to_string()));
+
+        let response = db_client
+            .query()
+            .table_name(table_name)
+            .index_name(index_name)
+            .key_condition_expression(key_condition_expression)
+            .expression_attribute_values(":email", AttributeValue::S(email))
+            .send().await
+            .map_err(|e| {
+                warn!("Failed to get db_client from context: {:?}", e);
+                AppError::DatabaseError(
+                    "Failed to get user by email from db".to_string()
+                ).to_graphql_error()
+            })?;
+        let items = response.items();
+        if let Some(first_item) = items.and_then(|items| items.first()) {
+            Ok(User::from_item(first_item))
+        } else {
+            Ok(None)
+        }
     }
 }
 
@@ -82,14 +159,17 @@ impl MutationRoot {
 
         let id = Uuid::new_v4().to_string();
 
+        // Generate User struct instance from params
         let user = match User::new(id, email, &password, first_name, last_name, pantry_name) {
             Ok(u) => u,
             Err(e) => {
                 return Err(AppError::InternalServerError(e).to_graphql_error());
             }
         };
+
+        // Turn User struct into DynamoDB Item
         let item = user.to_item();
-        // Transform DynamoDB error into our AppError, then into GraphQL error
+
         let put_item_output = db_client
             .put_item()
             .table_name("Users")
