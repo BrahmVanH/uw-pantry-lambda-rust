@@ -122,8 +122,9 @@ impl QueryRoot {
                 ).to_graphql_error()
             })?;
         let items = response.items();
-        if let Some(first_item) = items.and_then(|items| items.first()) {
-            Ok(User::from_item(first_item))
+
+        if let Some(user) = items.first() {
+            Ok(User::from_item(user))
         } else {
             Ok(None)
         }
