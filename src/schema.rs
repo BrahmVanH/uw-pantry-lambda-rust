@@ -185,4 +185,39 @@ impl MutationRoot {
         info!("put_item_output: {:?}", &put_item_output);
         Ok(user)
     }
+
+    async fn delete_user(
+        &self,
+        ctx: &Context<'_>,
+        email: String,
+        password: String
+    ) -> Result<String, Error> {
+        let table_name = "Users";
+
+        info!("Removing user: {}", email);
+        let db_client = ctx.data::<Client>().map_err(|e| {
+            warn!("Failed to get db_client from context: {:?}", e);
+            AppError::InternalServerError(
+                "Failed to access application db_client".to_string()
+            ).to_graphql_error()
+        })?;
+
+        info!("successfully created db_client: {:?}", &db_client);
+
+        
+
+        let remove_item_output = db_client
+            .delete_item()
+            .table_name(table_name)
+            .key("email", AttributeValue::S(email.clone().into()))
+            .send().await
+            .map_err(|e| {
+                warn!("Failed to delete user: {:?}", e);
+                AppError::DatabaseError(
+                    "Failed to delete user by email from db".to_string()
+                ).to_graphql_error()
+            })?;
+        info!("removed item successfully, output: {:?}", &remove_item_output);
+        Ok(email)
+    }
 }
