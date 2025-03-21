@@ -1,5 +1,5 @@
 use aws_sdk_dynamodb::Client;
-use axum::{ http::Method, routing::get, Router, extract::Extension };
+use axum::{ extract::Extension, http::Method, middleware::from_fn, routing::get, Router };
 use error::AppError;
 use schema::{ MutationRoot, QueryRoot };
 use tower::builder::ServiceBuilder;
@@ -18,6 +18,7 @@ mod schema;
 mod error;
 mod db;
 mod models;
+mod auth;
 
 // App state, replace with dynamo db connection
 #[derive(Clone)]
@@ -100,7 +101,9 @@ async fn main() {
         .allow_headers(Any);
 
     // Initialize axum router and add route endpoints
-    let app = Router::new().route("/graphql", get(graphql_playground).post(graphql_handler));
+    let app = Router::new()
+        .route("/graphql", get(graphql_playground).post(graphql_handler))
+        .layer(from_fn(auth::middleware::auth_middleware));
 
     let app = app.layer(
         ServiceBuilder::new()
