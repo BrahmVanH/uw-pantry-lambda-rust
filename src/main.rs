@@ -103,7 +103,7 @@ async fn main() {
     // Initialize axum router and add route endpoints
     let app = Router::new()
         .route("/graphql", get(graphql_playground).post(graphql_handler))
-        .layer(from_fn(auth::middleware::auth_middleware));
+        // .layer(from_fn(auth::middleware::auth_middleware));
 
     let app = app.layer(
         ServiceBuilder::new()

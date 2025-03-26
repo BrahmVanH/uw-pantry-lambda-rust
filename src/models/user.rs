@@ -16,7 +16,19 @@ use argon2::{
     Argon2,
 };
 
-// Each user is the agent of a food pantry
+/// Represents user in system
+///
+/// # Fields
+///
+/// * `id` - Unique identifier for user
+/// * `email` - email address of user
+/// * `password_hash` - hashed user password
+/// * `first_name` - users first name
+/// * `last_name` - users last name
+/// * `pantry_id` - ID of food pantry table row where user is agent
+/// * `created_at` - Date and time of creation
+/// * `updated_at` - Date and Time of creation
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct User {
     pub id: String,
@@ -24,19 +36,36 @@ pub struct User {
     pub password_hash: String,
     pub first_name: String,
     pub last_name: String,
-    pub pantry_name: String,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pantry_id: Option<String>,
+
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
 
+/// Defines methods for User
 impl User {
+    /// Creates new User instance
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - new user ID
+    /// * `email` - user email address
+    /// * `password` - user password
+    /// * `first_name` - user's first name
+    /// * `last_name` - user's last name
+    ///
+    /// # Returns
+    ///
+    /// New user instance
+
     pub fn new(
         id: String,
         email: String,
         password: &str,
         first_name: String,
-        last_name: String,
-        pantry_name: String
+        last_name: String
     ) -> Result<Self, String> {
         let now = Utc::now();
 
@@ -58,57 +87,81 @@ impl User {
             password_hash,
             first_name,
             last_name,
-            pantry_name,
+            pantry_id: None,
             created_at: now,
             updated_at: now,
         })
     }
-    // Turn into and from DynamoDB User Item
+    /// Creates User instance from DynamoDB item
+    ///
+    /// # Arguments
+    ///
+    /// * `item` - The dynamo db item
+    ///
+    /// # Returns
+    ///
+    /// 'some' User if item fields match, 'none' otherwise
+
     pub fn from_item(item: &HashMap<String, AttributeValue>) -> Option<Self> {
         info!("calling from_item with: {:?}", &item);
 
-        // Add debug logs to trace which field might be failing
-        let id = item.get("id")?.as_s().ok()?;
+        let id = item.get("id")?.as_s().ok()?.to_string();
         info!("got id: {}", id);
 
-        let email = item.get("email")?.as_s().ok()?;
+        let email = item.get("email")?.as_s().ok()?.to_string();
         info!("got email: {}", email);
 
-        let password = item.get("password_hash")?.as_s().ok()?;
+        let password_hash = item.get("password_hash")?.as_s().ok()?.to_string();
         info!("got password hash");
 
-        let first_name = item.get("first_name")?.as_s().ok()?;
+        let first_name = item.get("first_name")?.as_s().ok()?.to_string();
         info!("got first_name: {}", first_name);
 
-        let last_name = item.get("last_name")?.as_s().ok()?;
+        let last_name = item.get("last_name")?.as_s().ok()?.to_string();
         info!("got last_name: {}", last_name);
 
-        // Fix: Changed from "email" to "pantry_name"
-        let pantry_name = item.get("pantry_name")?.as_s().ok()?;
-        info!("got pantry_name: {}", pantry_name);
+        // Handle pantry item as optional field
+        let pantry_id = item
+            .get("pantry")
+            .and_then(|v| v.as_s().ok())
+            .map(|s| s.to_string());
+
+        let created_at = item
+            .get("created_at")
+            .and_then(|v| v.as_s().ok())
+            .and_then(|s| s.parse::<DateTime<Utc>>().ok())
+            .unwrap_or_else(|| Utc::now());
+
+        let updated_at = item
+            .get("updated_at")
+            .and_then(|v| v.as_s().ok())
+            .and_then(|s| s.parse::<DateTime<Utc>>().ok())
+            .unwrap_or_else(|| Utc::now());
 
         let res = Some(Self {
-            id: id.to_string(),
-            email: email.to_string(),
-            password_hash: password.to_string(),
-            first_name: first_name.to_string(),
-            last_name: last_name.to_string(),
-            pantry_name: pantry_name.to_string(),
-            created_at: item
-                .get("created_at")
-                .and_then(|v| v.as_s().ok())
-                .and_then(|s| s.parse::<DateTime<Utc>>().ok())
-                .unwrap_or_else(|| Utc::now()),
-            updated_at: item
-                .get("updated_at")
-                .and_then(|v| v.as_s().ok())
-                .and_then(|s| s.parse::<DateTime<Utc>>().ok())
-                .unwrap_or_else(|| Utc::now()),
+            id,
+            email,
+            password_hash,
+            first_name,
+            last_name,
+            pantry_id,
+            created_at,
+            updated_at,
         });
 
         info!("result of from_item: {:?}", &res);
         res
     }
+
+    /// Creates DynamoDB item from User instance
+    ///
+    /// # Arguments
+    ///
+    /// * `self` - borrowed instance of self
+    ///
+    /// # Returns
+    ///
+    ///   HashMap representing DB item for User instance
 
     pub fn to_item(&self) -> HashMap<String, AttributeValue> {
         let mut item = HashMap::new();
@@ -118,14 +171,28 @@ impl User {
         item.insert("password_hash".to_string(), AttributeValue::S(self.password_hash.clone()));
         item.insert("first_name".to_string(), AttributeValue::S(self.first_name.clone()));
         item.insert("last_name".to_string(), AttributeValue::S(self.last_name.clone()));
-        item.insert("pantry_name".to_string(), AttributeValue::S(self.pantry_name.clone()));
+        match &self.pantry_id {
+            Some(id) => {
+                item.insert("pantry_id".to_string(), AttributeValue::S(id.clone()));
+            }
+            None => (),
+        }
         item.insert("created_at".to_string(), AttributeValue::S(self.created_at.to_string()));
         item.insert("updated_at".to_string(), AttributeValue::S(self.updated_at.to_string()));
 
         item
     }
 
-    //  Validate password for login
+    /// Verifies that given password matches the parsed password hash on given user
+    ///
+    /// # Arguments
+    ///
+    /// * `self` - borrowed instance of self
+    ///
+    /// # Returns
+    ///
+    ///   HashMap representing DB item for Pantry instance
+
     pub fn verify_password(&self, password: &str) -> bool {
         // parse password hash
         let parsed_hash = match PasswordHash::new(&self.password_hash) {

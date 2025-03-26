@@ -60,26 +60,44 @@ impl MutationRoot {
     }
 
     // login user using email and password
-    async fn login(
-        &self,
-        ctx: &Context<'_>,
-        email: String,
-        password: String
-    ) -> Result<String, Error> {
-        let user = self.user_by_email(ctx, email);
-        map_err(|e| {
-            return e;
-        })?;
+    // async fn login(
+    //     &self,
+    //     ctx: &Context<'_>,
+    //     email: String,
+    //     password: String
+    // ) -> Result<String, Error> {
+    //     let user = self.user_by_email(ctx, email);
+    //     map_err(|e| {
+    //         return e;
+    //     })?;
 
         
-    }
+    // }
 
     // Remove user from database by email
+
+    /// Removes user from database using email and logged in status
+    /// 
+    /// # Arguments
+    /// 
+    /// * `ctx` - async-graphql Context object, contains dynamoDB client
+    /// 
+    /// * `email` - String representing email address of user to delete 
+    /// 
+    /// # Returns 
+    /// 
+    /// OK Result containing email address
+    /// 
+    /// # Errors
+    /// 
+    /// Returns an Internal Server Error (500) App error variant if db connection fails
+    /// 
+    /// Returns Database Error (500) App error variant if db.delete_item() fails 
+    
     async fn delete_user(
         &self,
         ctx: &Context<'_>,
         email: String,
-        password: String
     ) -> Result<String, Error> {
         let table_name = "Users";
 
@@ -107,4 +125,7 @@ impl MutationRoot {
         info!("removed item successfully, output: {:?}", &remove_item_output);
         Ok(email)
     }
+
+
+    
 }

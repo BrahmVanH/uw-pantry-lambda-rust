@@ -39,13 +39,13 @@
 
   ## Features
 
-  - Basic CRUD
+- Basic CRUD
 - User authentication
 - wicked small memory footprint
 
   ## Technologies
 
-  - Rust
+- Rust
 - AWS Lambda
 - DynamoDB
 - GraphQL
