@@ -6,3 +6,5 @@
 pub mod user;
 
 pub mod pantry;
+
+pub mod pantry_access;

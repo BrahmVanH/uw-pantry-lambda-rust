@@ -36,9 +36,7 @@ pub struct User {
     pub password_hash: String,
     pub first_name: String,
     pub last_name: String,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub pantry_id: Option<String>,
+    pub role: String,
 
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -65,6 +63,7 @@ impl User {
         email: String,
         password: &str,
         first_name: String,
+        role: String,
         last_name: String
     ) -> Result<Self, String> {
         let now = Utc::now();
@@ -87,7 +86,7 @@ impl User {
             password_hash,
             first_name,
             last_name,
-            pantry_id: None,
+            role,
             created_at: now,
             updated_at: now,
         })
@@ -120,11 +119,7 @@ impl User {
         let last_name = item.get("last_name")?.as_s().ok()?.to_string();
         info!("got last_name: {}", last_name);
 
-        // Handle pantry item as optional field
-        let pantry_id = item
-            .get("pantry")
-            .and_then(|v| v.as_s().ok())
-            .map(|s| s.to_string());
+        let role = item.get("role")?.as_s().ok()?.to_string();
 
         let created_at = item
             .get("created_at")
@@ -144,7 +139,7 @@ impl User {
             password_hash,
             first_name,
             last_name,
-            pantry_id,
+            role,
             created_at,
             updated_at,
         });
@@ -171,12 +166,7 @@ impl User {
         item.insert("password_hash".to_string(), AttributeValue::S(self.password_hash.clone()));
         item.insert("first_name".to_string(), AttributeValue::S(self.first_name.clone()));
         item.insert("last_name".to_string(), AttributeValue::S(self.last_name.clone()));
-        match &self.pantry_id {
-            Some(id) => {
-                item.insert("pantry_id".to_string(), AttributeValue::S(id.clone()));
-            }
-            None => (),
-        }
+        item.insert("role".to_string(), AttributeValue::S(self.role.to_string()));
         item.insert("created_at".to_string(), AttributeValue::S(self.created_at.to_string()));
         item.insert("updated_at".to_string(), AttributeValue::S(self.updated_at.to_string()));
 
@@ -233,18 +223,15 @@ impl User {
         &self.email
     }
 
-    /// User may not always have a pantry value or pantry field at all
-    async fn pantry_name(&self) -> &str {
-        match &self.pantry_id {
-            Some(id) => id,
-            None => "",
-        }
-    }
     async fn first_name(&self) -> &str {
         &self.first_name
     }
     async fn last_name(&self) -> &str {
         &self.last_name
+    }
+
+    async fn role(&self) -> &str {
+        &self.role
     }
     async fn created_at(&self) -> DateTime<Utc> {
         self.created_at

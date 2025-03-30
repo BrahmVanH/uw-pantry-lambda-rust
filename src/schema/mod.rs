@@ -11,6 +11,6 @@ pub use types::*;
 
 pub type AppSchema = Schema<EmptySubscription, MutationRoot, QueryRoot>;
 
-pub fn build_schema(db_client: &Client) -> Schema {
+pub fn build_schema(db_client: &Client) -> Schema<QueryRoot, MutationRoot, EmptySubscription> {
     Schema::build(QueryRoot, MutationRoot, EmptySubscription).data(db_client.clone()).finish()
 }
