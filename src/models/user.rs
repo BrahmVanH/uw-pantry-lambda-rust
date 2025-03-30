@@ -233,8 +233,12 @@ impl User {
         &self.email
     }
 
+    /// User may not always have a pantry value or pantry field at all
     async fn pantry_name(&self) -> &str {
-        &self.pantry_name
+        match &self.pantry_id {
+            Some(id) => id,
+            None => "",
+        }
     }
     async fn first_name(&self) -> &str {
         &self.first_name

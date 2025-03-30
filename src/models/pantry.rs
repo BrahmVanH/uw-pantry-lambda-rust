@@ -19,6 +19,7 @@
 
 use std::collections::HashMap;
 
+use async_graphql::Object;
 use aws_sdk_dynamodb::types::AttributeValue;
 use chrono::{ DateTime, Utc };
 use serde::{ Deserialize, Serialize };
@@ -158,19 +159,65 @@ impl Pantry {
     }
 
     /// Creates DynamoDB item from Pantry instance
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `self` - borrowed instance of self
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     ///   HashMap representing DB item for Pantry instance
+    /// 
+    /// # Errors
+    /// 
+    /// Returns an error if the serde_json::to_string() function does not complete
+    /// successfully on self.opt_status
 
     pub fn to_item(&self) -> HashMap<String, AttributeValue> {
-      let mut item = HashMap::new();
+        let mut item = HashMap::new();
 
-      item.insert("id".to_string(), v)
-    }  
-    
-  }
+        let opt_status_string = serde_json
+            ::to_string::<OptStatus>(&self.opt_status)
+            .map_err(|e| AppError::InternalServerError(e.to_string()))
+            .ok();
+
+        item.insert("id".to_string(), AttributeValue::S(self.id.clone()));
+        item.insert("name".to_string(), AttributeValue::S(self.name.clone()));
+        item.insert("agent_id".to_string(), AttributeValue::S(self.agent_id.clone()));
+        
+        match opt_status_string {
+            Some(s) => {
+                item.insert("opt_status".to_string(), AttributeValue::S(s));
+            }
+            None => (),
+        }
+
+        item.insert("created_at".to_string(), AttributeValue::S(self.created_at.to_string()));
+        item.insert("updated_at".to_string(), AttributeValue::S(self.updated_at.to_string()));
+
+        item
+    }
+
+
+    #[Object]
+    impl Pantry {
+        async fn id(&self) -> &str {
+            &self.id
+        }
+        async fn  name(&self) -> &str {
+            &self.name
+        }
+        async fn agent_id(&self) -> &str {
+            &self.agent_id
+        }
+        async fn (&self) -> &str {
+            &self
+        }
+        async fn (&self) -> &str {
+            &self
+        }
+        async fn (&self) -> &str {
+            &self
+        }
+    }
+}
